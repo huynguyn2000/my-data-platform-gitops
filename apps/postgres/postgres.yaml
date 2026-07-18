@@ -1,0 +1,69 @@
+---
+# A Secret holding the DB password. In real life you'd use a sealed-secret or
+# external secret manager — plaintext here is fine for a local learning cluster.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: data
+type: Opaque
+stringData:
+  POSTGRES_USER: platform
+  POSTGRES_PASSWORD: platform-dev-password
+  POSTGRES_DB: platformdb
+---
+# The Postgres server itself. A single replica Deployment is plenty for learning.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: data
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          # Where Postgres stores its data inside the container
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "platform"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        # emptyDir = data lives as long as the pod does. Ephemeral, but simplest.
+        # We'll graduate to a real PersistentVolumeClaim when we do Helm in Phase 3.
+        - name: data
+          emptyDir: {}
+---
+# A stable in-cluster address so other apps can reach Postgres at
+# "postgres.data.svc.cluster.local:5432"
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: data
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
