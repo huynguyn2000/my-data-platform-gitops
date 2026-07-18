@@ -1,0 +1,37 @@
+# A PostSync HOOK Job: ArgoCD runs this only AFTER the postgres app finishes syncing
+# (i.e. once Postgres itself is applied). Models "seed initial schemas once the
+# catalog/DB is online". It waits for Postgres to accept connections, then creates
+# and populates a bootstrap table — idempotently, so it's safe to run every sync.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-seed
+  namespace: data
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    # Keep the finished Job around for inspection; delete it right before the next run.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: seed
+          image: postgres:16
+          envFrom:
+            - secretRef:
+                name: postgres-secret     # gives POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+          command:
+            - sh
+            - -c
+            - |
+              export PGPASSWORD="$POSTGRES_PASSWORD"
+              echo "waiting for postgres to accept connections..."
+              until pg_isready -h postgres -U "$POSTGRES_USER" >/dev/null 2>&1; do sleep 2; done
+              echo "postgres is up — seeding bootstrap table"
+              psql -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+                "CREATE TABLE IF NOT EXISTS platform_bootstrap (id serial PRIMARY KEY, note text, created_at timestamptz DEFAULT now());"
+              psql -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+                "INSERT INTO platform_bootstrap (note) VALUES ('seeded by ArgoCD PostSync hook at '||now());"
+              echo "seed complete ✅"
