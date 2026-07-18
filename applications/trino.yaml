@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: trino
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://trinodb.github.io/charts   # a HELM repo, not a git repo
+    chart: trino                                 # which chart
+    targetRevision: 1.42.2                        # PIN the chart version
+    helm:
+      values: |                                   # our overrides (small footprint)
+        server:
+          workers: 1
+        coordinator:
+          jvm:
+            maxHeapSize: "1G"
+          config:
+            query:
+              maxMemoryPerNode: "512MB"
+        worker:
+          jvm:
+            maxHeapSize: "1G"
+          config:
+            query:
+              maxMemoryPerNode: "512MB"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: trino
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
