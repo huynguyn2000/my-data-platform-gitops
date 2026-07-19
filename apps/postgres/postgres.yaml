@@ -1,16 +1,7 @@
----
-# A Secret holding the DB password. In real life you'd use a sealed-secret or
-# external secret manager — plaintext here is fine for a local learning cluster.
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-secret
-  namespace: data
-type: Opaque
-stringData:
-  POSTGRES_USER: platform
-  POSTGRES_PASSWORD: platform-dev-password
-  POSTGRES_DB: platformdb
+# NOTE: the "postgres-secret" Secret is no longer here in plaintext.
+# It now lives — encrypted — in postgres-sealedsecret.yaml. The sealed-secrets
+# controller decrypts that in-cluster into a normal Secret named "postgres-secret",
+# which the Deployment below consumes via envFrom.
 ---
 # The Postgres server itself. A single replica Deployment is plenty for learning.
 apiVersion: apps/v1
