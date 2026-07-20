@@ -1,0 +1,12 @@
+# A tenant's resources. In production this folder would hold the domain's real infra
+# (a Trino schema bootstrap Job, Airflow worker pool, etc.). Here a ConfigMap stands in.
+# Note: no `namespace:` here on purpose — ArgoCD deploys it into THIS app's destination
+# namespace (tenant-marketing), so the same folder shape is reusable for every tenant.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-info
+data:
+  domain: marketing
+  owner: marketing-analytics
+  trino_schema: analytics_marketing
